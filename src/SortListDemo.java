@@ -3,6 +3,11 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import static java.util.Comparator.comparingInt;
+import static java.util.stream.Collectors.collectingAndThen;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.maxBy;
+
 public class SortListDemo {
 
     public static void main(String[] args) {
@@ -39,6 +44,27 @@ public class SortListDemo {
         employees.stream().sorted(Comparator.comparing(emp -> emp.getSalary())).forEach(System.out::println);
         //New - Method5
         employees.stream().sorted(Comparator.comparing(Employee::getSalary)).forEach(System.out::println);
+
+        //selecting top salary employee for each department
+        //Approach 1
+        Map<String, Employee> topEmployees = allEmployees.stream()
+                                                        .collect(
+                                                            groupingBy(
+                                                                        e -> e.department,
+                                                                        collectingAndThen(maxBy(comparingInt(e -> e.salary)), Optional::get) 
+                                                            ));
+
+        //Approach 2
+        Map<String, Employee> topEmployees =
+                                        allEmployees.stream()
+                                                .collect(    
+                                                    Collectors.toMap(
+                                                    e -> e.department,
+                                                    e -> e,
+                                                    BinaryOperator.maxBy(Comparator.comparingInt(e -> e.salary)) 
+                                                ));
+
+        
 
     }
 
