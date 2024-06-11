@@ -1,0 +1,166 @@
+Ref : https://medium.com/javarevisited/java-completablefuture-c47ca8c885af
+https://salithachathuranga94.medium.com/completablefuture-in-java-97b0b392657
+
+1. wait() and nottify()
+  1.1 Once the notify() method is called, the worker thread does not immediately give up the monitor. It continues owning the monitor until it exits the synchronized block.
+
+  1.2 Good link : https://medium.com/@adam.rizk9/demystifying-java-wait-notify-and-join-methods-for-multithreading-an-in-depth-look-ffb43a514bbc
+
+2. Future
+  -- Future class represents a future result of asynchronous computation. It will have a result in future after completion.
+  --- We can pass either Runnable or Callable to submit method. Since future.get() can be used to retrieve data, I used a callable(Callable will return something but Runnable does not).
+
+  2.1 Drawbacks had in Future
+    -- We can not complete a future manually
+    -- Multiple futures can not be chained together
+    -- No exception handling
+    -- Blocking — future.get() method will block the thread. So, it’s not completely asynchronous.
+
+
+3. Java CompletableFuture
+  -- CompletableFuture class is implementing both Future and CompletionStage interfaces.
+  -- public class CompletableFuture<T> implements Future<T>, CompletionStage<T>{}
+  -- It actually uses the global ForkJoinPool => commonPool to execute the tasks in parallel. If we want, we can pass our own thread pool also.
+
+  3.1 Join method
+      -- It is an instance method of the CompletableFuture class. It is used to return the value when the future is complete or throws an unchecked exception if completed exceptionally. If the task involved in the completion of the CompletableFuture raises an exception, then this method throws a CompletionException with the underlying exception as its cause.
+
+  3.1 runAsync
+      -- This method takes a Runnable as an argument and returns nothing
+      -- The processing is done by a separate thread in the ForkJoinPool.commonPool().
+      -- CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+             System.out.println("Thread: " + Thread.currentThread().getName());
+             System.out.println("Hello from async task");
+       });
+  3.2 supplyAsync
+      -- This method takes a Supplier as an argument and returns CompletableFuture of expected result data type.
+      -- CompletableFuture<String> future1 = CompletableFuture.supplyAsync(() -> "Hello");
+
+  3.2 Callback Methods /Async Methods of CompletableFuture
+      -- These methods are mainly used to chain set of futures and do whatever we want according to the scenario addressed.
+      -- ThenApplyAsync, ThenAcceptAsync, ThenRunAsync, ThenComposeAsync, ThenCombineAsync
+      -- Each of this kind of method has 3 versions. For an example,
+
+          --- thenApply(fn)
+                -- runs fn on a thread defined by the CompleteableFuture on which it is called, so you generally cannot know where this will be executed. It might immediately execute if the result is already available.
+          --- thenApplyAsync(fn)
+                —- runs fn on a environment-defined executor regardless of circumstances. For CompletableFuture this will generally be ForkJoinPool.commonPool().
+
+                --CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> "Hello");
+
+                  CompletableFuture<Integer> transformedFuture = future.thenApplyAsync(s -> {
+                      System.out.println("Thread: " + Thread.currentThread().getName());
+                      return s.length();
+                  });
+          --- thenApplyAsync(fn,exec)
+                -— runs fn on given executor instead of ForkJoinPool executor.
+
+      3.2.1 thenApplyAsync
+            --- This method is used to process the result of a task asynchronously and return a new CompletableFuture with the transformed result.
+            --- CompletableFuture<Integer> transformedFuture = future.thenApplyAsync(s -> {
+                    System.out.println("Thread: " + Thread.currentThread().getName());
+                    return s.length();
+                });
+
+      3.2.2 thenAcceptAsync
+            --- This method takes a Consumer as an argument and returns nothing. It’s also a Void asynchronous method
+            --- taskCompletableFuture.thenAcceptAsync(consumer).join();
+      3.2.3 thenRunAsync
+            --- This method takes a Runnable as an argument and returns nothing. It’s also a Void asynchronous method. The processing is done by a separate thread in the ForkJoinPool.commonPool().
+            --- CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                   System.out.println("Thread: " + Thread.currentThread().getName());
+                   System.out.println("Hello from async task");
+               });
+      3.2.4 thenComposeAsync
+            ---  is a method in CompletableFuture that allows you to chain multiple asynchronous tasks together in a non-blocking way. This method is used when you have one CompletableFuture object that returns another CompletableFuture object as its result, and you want to execute the second task after the first one has completed.
+            --- CompletableFuture<String> future1 = CompletableFuture.supplyAsync(() -> "Hello");
+                CompletableFuture<String> future2 = future1.thenComposeAsync(s -> CompletableFuture.supplyAsync(() -> s + " World"));
+                future2.thenAccept(result -> System.out.println(result));
+
+      3.2.5 thenCombineAsync
+            --- This method takes a BiFunction as an argument and returns a CompletableFuture of the expected result. It is used to combine two independent futures parallel and combine some result
+            --- Scenario:
+                 We need to get a user email and weather report parallel and send an email to that user.
+
+  3.2 Aggregation Methods
+      -- Please mind this word — aggregation is used by me just to differentiate methods. It’s not a standard classification! So far you know, we have several methods to deal with two futures, right?But how to deal with more than two futures? What are the methods available for this?
+      -- allOf and anyOf methods
+
+      3.2.1 allOf
+            -- When you have multiple futures to deal and perform some action after all those futures are completed only, this is the method to use. It returns a new CompletableFuture object when all of the specified CompletableFutures are complete. So, this method accepts a list of completablefutures. We can define and run them parallel and provide the futures into allOf method. If any of the specified CompletableFutures is completed with an exception, the resulting CompletableFuture does as well, with a CompletionException as the cause.
+
+      3.2.2 anyOf
+            -- When you have several asynchronous tasks and you want to return a result as soon as 1 future is completed, this is the method you would choose. The anyOf() method gets tricky when a list of completableFutures return multiple types of outcomes. Due to this, the user is not able to tell which future got completed first.
+
+  3.3 Handling Exceptions
+      -- There are 3 ways to handle exceptions while executing completable futures.
+      3.3.1 handle
+            -- Takes a BiFunction — result and exception which is executed when the stage completes either successfully or exceptionally. It does not matter whether program is executed properly or not. I will quickly show how it works using an erroneous scenario.
+
+      3.3.2 exceptionally
+            -- Takes a Function — exception which is executed when the stage completes exceptionally. We will only get the error and not the result as before.
+
+      3.3.3 whenComplete
+            -- This also takes a BiFunction — result and exception which is executed when the stage completes either successfully or exceptionally.
+            -- If we chain a callback method after this, it won’t behave like exceptionally and handle methods. We cannot return a result a value inside this whenComplete method. That’s the reason.
+
+
+********* Extra Examples of Exception Handling **********************
+
+      -- Handling an exception in a single CompletableFuture:
+          CompletableFuture<Integer> future = CompletableFuture.supplyAsync(() -> {
+              int result = 10 / 0; // Causes an ArithmeticException
+              return result;
+          });
+
+          future.exceptionally(ex -> {
+              System.out.println("Exception occurred: " + ex.getMessage());
+              return 0; // Default value to return if there's an exception
+          }).thenAccept(result -> {
+              System.out.println("Result: " + result);
+          });
+
+        -- Handling errors in multiple CompletableFuture objects:
+
+          CompletableFuture<Integer> future1 = CompletableFuture.supplyAsync(() -> {
+              // Some long-running operation
+              return 10;
+          });
+
+          CompletableFuture<Integer> future2 = CompletableFuture.supplyAsync(() -> {
+              int result = 10 / 0; // Causes an ArithmeticException
+              return result;
+          });
+
+          CompletableFuture<Integer> future3 = CompletableFuture.supplyAsync(() -> {
+              // Some long-running operation
+              return 20;
+          });
+
+          CompletableFuture<Void> allFutures = CompletableFuture.allOf(future1, future2, future3);
+
+          allFutures.exceptionally(ex -> {
+              System.out.println("Exception occurred: " + ex.getMessage());
+              return null; // Default value to return if there's an exception
+          }).thenRun(() -> {
+              // All futures completed
+              int result1 = future1.join();
+              int result2 = future2.join();
+              int result3 = future3.join();
+              System.out.println(result1 + ", " + result2 + ", " + result3);
+          });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

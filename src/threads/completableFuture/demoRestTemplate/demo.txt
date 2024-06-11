@@ -1,0 +1,9 @@
+Example
+
+We have 3 services asynchronously using RestTemplate and aggregates all the responses before sending the response to the caller.
+
+1. Create a service that uses RestTemplate to call the three endpoints asynchronously. You can use Spring’s AsyncRestTemplate to achieve this. Here's an example of how you can create a service that calls three endpoints and aggregates their responses:
+
+In the example above, we’re calling three endpoints /users, /products, and /orders asynchronously using AsyncRestTemplate. We're using CompletableFuture to handle the asynchronous calls and aggregate their responses. Once all the responses are received, we're returning an AggregatedResponse object containing the data from all the endpoints.
+
+2. Create a REST endpoint that calls the AggregatorService and returns the aggregated response. Here's an example of how you can create a REST endpoint that calls the AggregatorService
